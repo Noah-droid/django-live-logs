@@ -123,11 +123,31 @@ application = ProtocolTypeRouter({
 ---
 
 ## 3. Usage
+Simply run your Django server:
+```bash
+python manage.py runserver
+```
 
-1. Log into your standard Django Admin panel (e.g., `/admin/`).
-2. Navigate to `/live-logs/` in your browser.
-3. Click **Connect**.
-4. Watch your server logs flow in real-time!
+Navigate to `/live-logs/` in your browser. 
+If `LIVE_LOGS_PASSWORD` is configured, type in your team password.
+If not, it will fall back to requiring a standard Django superuser session. Once authenticated, the dark mode dashboard will connect via WebSockets, and any `logging.info()`, `logging.error()`, etc., triggered anywhere in your backend will stream to your screen instantly!
+
+---
+
+## Troubleshooting & Production
+
+### CSRF & Origin Headers (403 Forbidden)
+If you deploy your app behind a reverse proxy (like Nginx) with HTTPS, Django's security middleware or Channels' `AllowedHostsOriginValidator` might block your connections. Ensure your `settings.py` is configured with your production domains:
+
+```python
+ALLOWED_HOSTS = ["your-domain.com"]
+
+# Trust your domain for CSRF and WebSocket origins
+CSRF_TRUSTED_ORIGINS = [
+    "https://your-domain.com",
+    "http://your-domain.com",
+]
+```
 
 ## How it Works
 The custom `WebSocketLogHandler` intercepts Python logs. Instead of blocking the main thread, it tosses the log payload to a daemon thread. The daemon thread safely uses `async_to_sync` to dispatch the JSON payload to the Redis Channel Layer. Finally, the Django Channels WebSocket consumer securely beams it to the authenticated frontend UI.
