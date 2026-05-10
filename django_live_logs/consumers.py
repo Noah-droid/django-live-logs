@@ -3,13 +3,29 @@ from django.conf import settings
 
 class LiveLogConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
-        # Allow configuration of who can view logs. Defaults to superusers only.
-        require_superuser = getattr(settings, 'LIVE_LOGS_REQUIRE_SUPERUSER', True)
+        required_password = getattr(settings, 'LIVE_LOGS_PASSWORD', None)
         
-        user = self.scope.get("user")
-        if require_superuser and (not user or not user.is_superuser):
-            await self.close(code=4003)
-            return
+        if required_password:
+            headers = self.scope.get('headers', [])
+            auth_success = False
+            for name, value in headers:
+                if name == b'cookie':
+                    cookie_str = value.decode('utf-8')
+                    # Basic check for the exact auth token cookie
+                    if f"live_logs_auth={required_password}" in cookie_str:
+                        auth_success = True
+                        break
+            
+            if not auth_success:
+                await self.close(code=4003)
+                return
+        else:
+            # Fallback to standard Django session check
+            require_superuser = getattr(settings, 'LIVE_LOGS_REQUIRE_SUPERUSER', True)
+            user = self.scope.get("user")
+            if require_superuser and (not user or not user.is_superuser):
+                await self.close(code=4003)
+                return
 
         self.group_name = "admin_live_logs"
         await self.channel_layer.group_add(self.group_name, self.channel_name)

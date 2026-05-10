@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: django-live-logs
-Version: 0.1.2
+Version: 0.1.3
 Summary: A standalone Django package to stream logs over WebSockets.
 Author: Your Name
 Description-Content-Type: text/markdown
@@ -82,10 +82,13 @@ urlpatterns = [
 ```
 
 ### Step C: Route the WebSockets (ASGI)
-In your `asgi.py`, make sure your WebSockets are wrapped in Django's `AuthMiddlewareStack` so it can read your admin session cookies securely. Then include the routing:
+In your `asgi.py`, you need to route the WebSockets. Because `django-live-logs` uses the Django Admin session to authenticate the UI, it requires Django's `AuthMiddlewareStack`.
+
+If your entire application uses Session Auth, simply wrap your `URLRouter`:
 
 ```python
 from channels.auth import AuthMiddlewareStack
+from django.urls import path, include
 import django_live_logs.routing
 
 application = ProtocolTypeRouter({
@@ -93,11 +96,33 @@ application = ProtocolTypeRouter({
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                # Your existing websocket routes + Live Logs routes
                 your_app_routing.websocket_urlpatterns + 
                 django_live_logs.routing.websocket_urlpatterns
             )
         )
+    ),
+})
+```
+
+**Advanced: Using JWT / Custom Auth in your main app?**
+If your main application uses custom JWT auth and you want to completely isolate `AuthMiddlewareStack` so it doesn't interfere with your custom websockets, use a branching router:
+
+```python
+from django.urls import re_path
+from channels.auth import AuthMiddlewareStack
+from your_app.middleware import CustomTokenAuthMiddleware
+import django_live_logs.routing
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AllowedHostsOriginValidator(
+        URLRouter([
+            # 1. Isolate Session Auth strictly to the Live Logs endpoint
+            re_path(r"^ws/live-logs/", AuthMiddlewareStack(URLRouter(django_live_logs.routing.websocket_urlpatterns))),
+            
+            # 2. Use your custom JWT auth for everything else
+            re_path(r"^", CustomTokenAuthMiddleware(URLRouter(your_app_routing.websocket_urlpatterns))),
+        ])
     ),
 })
 ```
