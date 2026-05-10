@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Django Live Logs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .log-enter { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-mono flex flex-col">
+    
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="relative flex h-3 w-3">
+                    <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </div>
+                <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                    Django Live Logs
+                </h1>
+            </div>
+
+            <!-- Connection Controls -->
+            <div class="flex w-full md:w-auto items-center gap-3">
+                <button id="connect-btn" onclick="toggleConnection()" 
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap shadow">
+                    Connect
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Bar -->
+    <div class="bg-gray-800/50 border-b border-gray-700 p-2">
+        <div class="max-w-7xl mx-auto flex justify-between items-center px-2">
+            <div class="flex gap-2 text-xs">
+                <button onclick="filterLogs('ALL')" class="filter-btn bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors active ring-1 ring-white" data-level="ALL">All</button>
+                <button onclick="filterLogs('INFO')" class="filter-btn bg-blue-900/50 text-blue-300 hover:bg-blue-800/50 px-3 py-1 rounded transition-colors" data-level="INFO">Info</button>
+                <button onclick="filterLogs('WARNING')" class="filter-btn bg-amber-900/50 text-amber-300 hover:bg-amber-800/50 px-3 py-1 rounded transition-colors" data-level="WARNING">Warn</button>
+                <button onclick="filterLogs('ERROR')" class="filter-btn bg-red-900/50 text-red-300 hover:bg-red-800/50 px-3 py-1 rounded transition-colors" data-level="ERROR">Error</button>
+            </div>
+            <button onclick="clearLogs()" class="text-gray-400 hover:text-white text-xs px-3 py-1 rounded hover:bg-gray-700 transition-colors">
+                Clear Logs
+            </button>
+        </div>
+    </div>
+
+    <!-- Logs Container -->
+    <main class="flex-1 overflow-auto p-4 max-w-7xl w-full mx-auto" id="logs-container">
+        <!-- Waiting State -->
+        <div id="waiting-state" class="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 pt-20">
+            <svg class="w-16 h-16 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M4 15V9a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2z"></path></svg>
+            <p>Click Connect to start streaming server logs in real-time.</p>
+        </div>
+    </main>
+
+    <script>
+        let ws = null;
+        let activeFilter = 'ALL';
+        const logsContainer = document.getElementById('logs-container');
+        const waitingState = document.getElementById('waiting-state');
+        const connectBtn = document.getElementById('connect-btn');
+        const statusPing = document.getElementById('status-ping');
+        const statusDot = document.getElementById('status-dot');
+
+        function getLevelColors(level) {
+            switch(level) {
+                case 'INFO': return 'text-blue-400 border-blue-900/50 bg-blue-900/10';
+                case 'WARNING': return 'text-amber-400 border-amber-900/50 bg-amber-900/10';
+                case 'ERROR': return 'text-red-400 border-red-900/50 bg-red-900/10';
+                case 'CRITICAL': return 'text-purple-400 border-purple-900/50 bg-purple-900/10 font-bold';
+                default: return 'text-gray-300 border-gray-700 bg-gray-800/30';
+            }
+        }
+
+        function filterLogs(level) {
+            activeFilter = level;
+            
+            // Update buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.dataset.level === level) {
+                    btn.classList.add('ring-1', 'ring-white');
+                } else {
+                    btn.classList.remove('ring-1', 'ring-white');
+                }
+            });
+
+            // Update visible logs
+            document.querySelectorAll('.log-entry').forEach(entry => {
+                if (level === 'ALL' || entry.dataset.level === level) {
+                    entry.style.display = 'block';
+                } else {
+                    entry.style.display = 'none';
+                }
+            });
+        }
+
+        function clearLogs() {
+            document.querySelectorAll('.log-entry').forEach(e => e.remove());
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                waitingState.style.display = 'flex';
+            }
+        }
+
+        function addLog(data) {
+            waitingState.style.display = 'none';
+            const colors = getLevelColors(data.level);
+            
+            // Format timestamp if it exists, otherwise use current time
+            let timeStr = new Date().toLocaleTimeString();
+            if (data.timestamp) {
+                const d = new Date(data.timestamp);
+                timeStr = d.toLocaleTimeString() + '.' + d.getMilliseconds().toString().padStart(3, '0');
+            }
+
+            const div = document.createElement('div');
+            div.className = `log-entry log-enter border-l-4 rounded p-3 mb-2 text-sm shadow-sm ${colors}`;
+            div.dataset.level = data.level;
+            
+            if (activeFilter !== 'ALL' && activeFilter !== data.level) {
+                div.style.display = 'none';
+            }
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-1">
+                    <div class="flex gap-2 text-xs font-semibold opacity-75">
+                        <span class="px-1.5 py-0.5 rounded bg-gray-900/50">${data.level}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-gray-900/50">${data.module || 'system'}</span>
+                    </div>
+                    <span class="text-xs opacity-50">${timeStr}</span>
+                </div>
+                <div class="whitespace-pre-wrap break-words leading-relaxed">${data.message}</div>
+            `;
+            
+            logsContainer.appendChild(div);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            
+            // Keep only last 500 logs to prevent memory leaks
+            if (logsContainer.children.length > 501) { // +1 for waiting state
+                logsContainer.removeChild(logsContainer.children[1]);
+            }
+        }
+
+        function toggleConnection() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            connectBtn.textContent = 'Connecting...';
+            connectBtn.classList.replace('bg-blue-600', 'bg-amber-600');
+            
+            // Determine WS URL automatically
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/live-logs/`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                connectBtn.textContent = 'Disconnect';
+                connectBtn.classList.replace('bg-amber-600', 'bg-red-600');
+                connectBtn.classList.replace('bg-blue-600', 'bg-red-600');
+                statusPing.classList.replace('bg-red-400', 'bg-emerald-400');
+                statusDot.classList.replace('bg-red-500', 'bg-emerald-500');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addLog(data);
+                } catch (e) {
+                    console.error("Failed to parse log message:", event.data);
+                }
+            };
+
+            ws.onclose = (event) => {
+                connectBtn.textContent = 'Connect';
+                connectBtn.classList.replace('bg-red-600', 'bg-blue-600');
+                connectBtn.classList.replace('bg-amber-600', 'bg-blue-600');
+                statusPing.classList.replace('bg-emerald-400', 'bg-red-400');
+                statusDot.classList.replace('bg-emerald-500', 'bg-red-500');
+                
+                if (event.code === 4003) {
+                    addLog({ level: 'ERROR', message: 'Connection Rejected: Invalid Token or Not a Superuser', module: 'system' });
+                } else if (!event.wasClean) {
+                    addLog({ level: 'WARNING', message: 'Connection Lost. Retrying...', module: 'system' });
+                }
+                ws = null;
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket Error:", error);
+            };
+        }
+    </script>
+</body>
+</html>

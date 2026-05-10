@@ -1,0 +1,1 @@
+recursive-include django_live_logs/templates *
