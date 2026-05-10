@@ -98,23 +98,23 @@ application = ProtocolTypeRouter({
 ```
 
 **Advanced: Using JWT / Custom Auth in your main app?**
-If your main application uses custom JWT auth and you want to completely isolate `AuthMiddlewareStack` so it doesn't interfere with your custom websockets, use a branching router:
+If your main application uses custom JWT auth and you want to completely isolate `AuthMiddlewareStack` so it doesn't interfere with your custom websockets, use a direct mapping in your `URLRouter`. This is the most reliable way to avoid routing conflicts:
 
 ```python
 from django.urls import re_path
 from channels.auth import AuthMiddlewareStack
-from your_app.middleware import CustomTokenAuthMiddleware
-import django_live_logs.routing
+import django_live_logs.consumers
+import your_app_routing
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AllowedHostsOriginValidator(
         URLRouter([
-            # 1. Isolate Session Auth strictly to the Live Logs endpoint
-            re_path(r"^ws/live-logs/", AuthMiddlewareStack(URLRouter(django_live_logs.routing.websocket_urlpatterns))),
+            # 1. Map Live Logs directly to its consumer with Session Auth
+            re_path(r"^ws/live-logs/$", AuthMiddlewareStack(django_live_logs.consumers.LiveLogConsumer.as_asgi())),
             
-            # 2. Use your custom JWT auth for everything else
-            re_path(r"^", CustomTokenAuthMiddleware(URLRouter(your_app_routing.websocket_urlpatterns))),
+            # 2. Map everything else to your custom Token Auth
+            re_path(r"^", YourTokenAuthMiddleware(URLRouter(your_app_routing.websocket_urlpatterns))),
         ])
     ),
 })
