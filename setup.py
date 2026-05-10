@@ -1,8 +1,13 @@
+import os
 from setuptools import setup, find_packages
+
+# Read the README.md for PyPI description
+with open(os.path.join(os.path.dirname(__file__), 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name="django-live-logs",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -11,4 +16,6 @@ setup(
     ],
     author="Your Name",
     description="A standalone Django package to stream logs over WebSockets.",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
 )
