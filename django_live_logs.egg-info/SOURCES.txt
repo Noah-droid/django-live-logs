@@ -13,3 +13,4 @@ django_live_logs.egg-info/dependency_links.txt
 django_live_logs.egg-info/requires.txt
 django_live_logs.egg-info/top_level.txt
 django_live_logs/templates/django_live_logs/dashboard.html
+django_live_logs/templates/django_live_logs/login.html

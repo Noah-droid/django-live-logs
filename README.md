@@ -33,6 +33,13 @@ INSTALLED_APPS = [
 ]
 ```
 
+**Authentication Options:**
+By default, the dashboard requires users to be logged into the standard Django Admin interface as a Superuser.
+If you prefer to use a shared team password instead of Django sessions, simply add this variable:
+```python
+LIVE_LOGS_PASSWORD = "your-secure-team-password"
+```
+
 Configure your `LOGGING` dictionary to catch everything (the root logger) and send it to the WebSocket handler:
 ```python
 LOGGING = {
