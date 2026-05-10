@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: django-live-logs
-Version: 0.1.4
+Version: 0.1.5
 Summary: A standalone Django package to stream logs over WebSockets.
 Author: Your Name
 Description-Content-Type: text/markdown
@@ -45,6 +45,13 @@ INSTALLED_APPS = [
     # ...
     'django_live_logs',
 ]
+```
+
+**Authentication Options:**
+By default, the dashboard requires users to be logged into the standard Django Admin interface as a Superuser.
+If you prefer to use a shared team password instead of Django sessions, simply add this variable:
+```python
+LIVE_LOGS_PASSWORD = "your-secure-team-password"
 ```
 
 Configure your `LOGGING` dictionary to catch everything (the root logger) and send it to the WebSocket handler:

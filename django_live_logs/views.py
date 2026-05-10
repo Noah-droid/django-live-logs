@@ -1,7 +1,9 @@
 from django.shortcuts import render
 from django.conf import settings
 from django.http import HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
 
+@csrf_exempt
 def live_logs_dashboard(request):
     """
     Renders the live log dashboard UI.
