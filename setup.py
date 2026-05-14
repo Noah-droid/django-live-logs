@@ -14,7 +14,7 @@ setup(
         "Django>=3.2",
         "channels>=4.0",
     ],
-    author="Your Name",
+    author="Noah-droid",
     description="A standalone Django package to stream logs over WebSockets.",
     long_description=long_description,
     long_description_content_type="text/markdown",
